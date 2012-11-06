@@ -31,6 +31,15 @@ public class MqttServiceDelegate
 		context.stopService(svc); 
 	}
 	
+	public static void publish(Context context, String topic, byte[] payload)
+	{
+		Intent broadcastIntent = new Intent();
+        broadcastIntent.setAction(MqttService.MQTT_PUBLISH_MSG_INTENT);
+        broadcastIntent.putExtra(MqttService.MQTT_PUBLISH_MSG_TOPIC, topic);
+        broadcastIntent.putExtra(MqttService.MQTT_PUBLISH_MSG, payload);
+        context.sendBroadcast(broadcastIntent); 
+	}
+	
 	public static class StatusReceiver extends BroadcastReceiver  
 	{
 		private List<StatusHandler> statusHandlers = new ArrayList<StatusHandler>();

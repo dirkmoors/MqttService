@@ -7,6 +7,10 @@ import android.app.Activity;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import com.qonect.protocols.mqtt.MqttServiceDelegate.MessageHandler;
@@ -25,6 +29,8 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 	
 	private TextView timestampView, topicView, messageView, statusView;
 	
+	private EditText publishEditView;
+	private Button publishButton;
 	
 	@Override  
 	public void onCreate(Bundle savedInstanceState)   
@@ -38,6 +44,19 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 		topicView = (TextView)findViewById(R.id.topicView);
 		messageView = (TextView)findViewById(R.id.messageView);	
 		statusView = (TextView)findViewById(R.id.statusView);
+		
+		publishEditView = (EditText)findViewById(R.id.publishEditView);
+		publishButton = (Button)findViewById(R.id.publishButton);
+		
+		publishButton.setOnClickListener(new OnClickListener() {			
+			@Override
+			public void onClick(View v) {
+				MqttServiceDelegate.publish(
+					MqttTestActivity.this, 
+					"the-topic-that-is-now-unused-in-service!", 
+					publishEditView.getText().toString().getBytes());
+			}
+		});
 	}  
 	
 	@Override

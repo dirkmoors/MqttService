@@ -27,6 +27,7 @@ import android.util.Log;
 
 import com.qonect.protocols.mqtt.impl.MqttConnectOptions;
 import com.qonect.protocols.mqtt.impl.MqttException;
+import com.qonect.protocols.mqtt.impl.MqttMessage;
 import com.qonect.protocols.mqtt.impl.MqttPersistenceException;
 import com.qonect.protocols.mqtt.impl.MqttTopic;
 import com.qonect.protocols.mqtt.impl.paho.PahoMqttClientFactory;
@@ -63,6 +64,11 @@ public class MqttService extends Service implements IMqttCallback
     public static final String MQTT_MSG_RECEIVED_INTENT = "com.qonect.services.mqtt.MSGRECVD";
     public static final String MQTT_MSG_RECEIVED_TOPIC  = "com.qonect.services.mqtt.MSGRECVD_TOPIC";
     public static final String MQTT_MSG_RECEIVED_MSG    = "com.qonect.services.mqtt.MSGRECVD_MSG";
+    
+    // constants used to notify the Service of messages to send   
+    public static final String MQTT_PUBLISH_MSG_INTENT = "com.qonect.services.mqtt.SENDMSG";
+    public static final String MQTT_PUBLISH_MSG_TOPIC  = "com.qonect.services.mqtt.SENDMSG_TOPIC";
+    public static final String MQTT_PUBLISH_MSG    = "com.qonect.services.mqtt.SENDMSG_MSG";
     
     // constants used to tell the Activity UI the connection status
     public static final String MQTT_STATUS_INTENT = "com.qonect.services.mqtt.STATUS";
@@ -155,6 +161,9 @@ public class MqttService extends Service implements IMqttCallback
     // connection to the message broker
     private IMqttClient mqttClient = null;
     private IMqttClientFactory mqttClientFactory;
+    
+    // receiver that notifies the Service when an activity wants to publish to the mqtt
+    private MessageSender messageSender;
     
     // receiver that notifies the Service when the phone gets data connection 
     private NetworkConnectionIntentReceiver netConnReceiver;
@@ -329,8 +338,14 @@ public class MqttService extends Service implements IMqttCallback
         {
             netConnReceiver = new NetworkConnectionIntentReceiver();            
             registerReceiver(netConnReceiver, 
-            	new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
-            
+            	new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));            
+        }
+        
+        if(messageSender == null)
+        {
+        	messageSender = new MessageSender();
+        	registerReceiver(messageSender,
+        		new IntentFilter(MQTT_PUBLISH_MSG_INTENT));
         }
         
         // creates the intents that are used to wake up the phone when it is 
@@ -796,6 +811,12 @@ public class MqttService extends Service implements IMqttCallback
                 unregisterReceiver(pingSender);
                 pingSender = null;
             }
+            
+            if(messageSender != null)
+            {
+            	unregisterReceiver(messageSender);
+            	messageSender = null;
+            }
         }
         catch (Exception eee)
         {
@@ -930,6 +951,31 @@ public class MqttService extends Service implements IMqttCallback
     private String getConnectionChangeTimestamp(){
     	return connectionStatusChangeTime.toString();
     }
+    
+    public class MessageSender extends BroadcastReceiver  
+	{
+    	private static final String TAG = "MessageSender";
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			Log.d(TAG, "onReceive");
+			
+			if(!isOnline() || !isConnected()){
+				Log.e(TAG, "onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());
+				return;
+			}
+			
+			byte[] payload = intent.getByteArrayExtra(MQTT_PUBLISH_MSG);
+			
+			try
+			{
+				mqttClient.publish(new MqttTopic("test-topic"), new MqttMessage(payload));
+			}
+			catch(MqttException e)
+			{
+				e.printStackTrace();
+			}
+		}
+	}
     
     /*
      * Called in response to a change in network connection - after losing a 
