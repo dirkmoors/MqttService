@@ -1,11 +1,14 @@
 package com.qonect.protocols.mqtt.service;
 
+import java.io.File;
 import java.lang.ref.WeakReference;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+
+import org.apache.log4j.Logger;
 
 import android.app.AlarmManager;
 import android.app.NotificationManager;
@@ -19,11 +22,11 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Environment;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.provider.Settings.Secure;
-import android.util.Log;
 
 import com.qonect.protocols.mqtt.impl.MqttConnectOptions;
 import com.qonect.protocols.mqtt.impl.MqttException;
@@ -38,6 +41,7 @@ import com.qonect.protocols.mqtt.interfaces.IMqttConnectOptions;
 import com.qonect.protocols.mqtt.interfaces.IMqttMessage;
 import com.qonect.protocols.mqtt.interfaces.IMqttPersistence;
 import com.qonect.protocols.mqtt.interfaces.IMqttTopic;
+import com.qonect.protocols.mqtt.logging.ConfigureLog4J;
 
 /*
  * An example of how to implement an MQTT client in Android, able to receive
@@ -52,6 +56,8 @@ import com.qonect.protocols.mqtt.interfaces.IMqttTopic;
 
 public class MqttService extends Service implements IMqttCallback
 {
+	private static final Logger LOG = Logger.getLogger(MqttService.class);
+	
     /************************************************************************/
     /*    CONSTANTS                                                         */
     /************************************************************************/
@@ -100,8 +106,6 @@ public class MqttService extends Service implements IMqttCallback
 
     // MQTT constants
     public static final int MAX_MQTT_CLIENTID_LENGTH = 22;
-
-	private static final String TAG = "MQTTService";
     
     /************************************************************************/
     /*    VARIABLES used to maintain state                                  */
@@ -181,6 +185,8 @@ public class MqttService extends Service implements IMqttCallback
     {
         super.onCreate();
         
+        initLog();
+        
         // reset status variable to initial state
         changeStatus(ConnectionStatus.INITIAL);
         
@@ -206,14 +212,14 @@ public class MqttService extends Service implements IMqttCallback
         // platform.  On 2.0 or later we override onStartCommand() so this
         // method will not be called. 
     	
-    	Log.d(TAG, "onStart: intent="+intent+", startId="+startId);    	
+    	LOG.debug("onStart: intent="+intent+", startId="+startId);    	
     	doStart(intent, startId);
     }
 
     @Override
     public int onStartCommand(final Intent intent, int flags, final int startId) 
     {
-    	Log.d(TAG, "onStartCommand: intent="+intent+", flags="+flags+", startId="+startId);    	
+    	LOG.debug("onStartCommand: intent="+intent+", flags="+flags+", startId="+startId);    	
     	doStart(intent, startId);
         
         // return START_NOT_STICKY - we want this Service to be left running 
@@ -252,7 +258,7 @@ public class MqttService extends Service implements IMqttCallback
         {
             // we were unable to define the MQTT client connection, so we stop 
             //  immediately - there is nothing that we can do
-        	Log.d(TAG, "handleStart: mqttClient == null");
+        	LOG.debug("handleStart: mqttClient == null");
             stopSelf();
             return;
         }
@@ -303,7 +309,7 @@ public class MqttService extends Service implements IMqttCallback
                                                                     PendingIntent.FLAG_UPDATE_CURRENT);
             notification.setLatestEventInfo(this, "MQTT", "MQTT Service is running", contentIntent);        
             nm.notify(MQTT_NOTIFICATION_ONGOING, notification);*/
-            Log.d(TAG, "handleStart: connectionStatus="+connectionStatus);
+        	LOG.debug("handleStart: connectionStatus="+connectionStatus);
             
             
             // before we attempt to connect - we check if the phone has a 
@@ -360,8 +366,8 @@ public class MqttService extends Service implements IMqttCallback
     @Override
     public void onDestroy() 
     {
-        super.onDestroy();
-
+    	LOG.debug("onDestroy");
+    	
         // disconnect immediately
         disconnectFromBroker();
 
@@ -372,6 +378,8 @@ public class MqttService extends Service implements IMqttCallback
             mBinder.close();
             mBinder = null;
         }
+        
+        super.onDestroy();
     }
     
     
@@ -428,7 +436,7 @@ public class MqttService extends Service implements IMqttCallback
                                                                 PendingIntent.FLAG_UPDATE_CURRENT);
         notification.setLatestEventInfo(this, title, body, contentIntent);
         nm.notify(MQTT_NOTIFICATION_UPDATE, notification);   */
-    	Log.d(TAG, "notifyUser: alert="+alert+", title="+title+", body="+body);
+    	LOG.debug("notifyUser: alert="+alert+", title="+title+", body="+body);
     }
     
     
@@ -608,9 +616,10 @@ public class MqttService extends Service implements IMqttCallback
         //String messageBody = new String(payloadbytes);
             
         // inform the app (for times when the Activity UI is running) of the 
-        //   received message so the app UI can be updated with the new data
+        //   received message so the app UI can be updated with the new data        
         try 
         {
+        	LOG.debug("messageArrived: topic="+topic.getName()+", message="+new String(message.getPayload()));
 			broadcastReceivedMessage(topic.getName(), message.getPayload());
 		} 
         catch (MqttException e) 
@@ -692,6 +701,8 @@ public class MqttService extends Service implements IMqttCallback
      */
     private boolean connectToBroker()
     {
+    	LOG.debug("connectToBroker");
+    	
         try
         {            
         	IMqttConnectOptions options = new MqttConnectOptions();
@@ -751,13 +762,15 @@ public class MqttService extends Service implements IMqttCallback
      */
     private void subscribeToTopics()
     {
+    	LOG.debug("subscribeToTopics");
+    	
         boolean subscribed = false;
         
         if (!isConnected())
         {
             // quick sanity check - don't try and subscribe if we 
             //  don't have a connection            
-            Log.e(TAG, "Unable to subscribe as we are not connected");
+            LOG.error("Unable to subscribe as we are not connected");
         }
         else 
         {                                    
@@ -770,11 +783,11 @@ public class MqttService extends Service implements IMqttCallback
             }             
             catch (IllegalArgumentException e) 
             {
-                Log.e(TAG, "subscribe failed - illegal argument", e);
+            	LOG.error("subscribe failed - illegal argument", e);
             } 
             catch (MqttException e) 
             {
-                Log.e(TAG, "subscribe failed - MQTT exception", e);
+            	LOG.error("subscribe failed - MQTT exception", e);
             }
         }
         
@@ -796,6 +809,8 @@ public class MqttService extends Service implements IMqttCallback
      */
     private void disconnectFromBroker()
     {
+    	LOG.debug("disconnectFromBroker");
+    	
         // if we've been waiting for an Internet connection, this can be 
         //  cancelled - we don't need to be told when we're connected now
         try
@@ -821,7 +836,7 @@ public class MqttService extends Service implements IMqttCallback
         catch (Exception eee)
         {
             // probably because we hadn't registered it
-            Log.e(TAG, "unregister failed", eee);
+        	LOG.error("unregister failed", eee);
         }
 
         try 
@@ -833,11 +848,11 @@ public class MqttService extends Service implements IMqttCallback
         } 
         catch (MqttPersistenceException e) 
         {
-            Log.e(TAG, "disconnect failed - persistence exception", e);
+        	LOG.error("disconnect failed - persistence exception", e);
         }
 		catch (MqttException e)
 		{
-			Log.e(TAG, "disconnect failed - mqtt exception", e);
+			LOG.error("disconnect failed - mqtt exception", e);
 		}
         finally
         {
@@ -952,15 +967,32 @@ public class MqttService extends Service implements IMqttCallback
     	return connectionStatusChangeTime.toString();
     }
     
+    private void initLog(){
+    	File backupPath = Environment.getExternalStorageDirectory();
+
+        backupPath = new File(backupPath.getPath() + "/log");
+
+        if(!backupPath.exists()){
+        	backupPath.mkdirs();
+        }
+        
+        backupPath = new File(backupPath.getPath(), "MqttService.csv");
+    	
+    	ConfigureLog4J.configure(backupPath.getPath(), ConfigureLog4J.PATTERN_CSV);
+        
+        LOG.debug("initLog: Logging to ["+backupPath.getPath()+"]");
+    }
+    
     public class MessageSender extends BroadcastReceiver  
 	{
-    	private static final String TAG = "MessageSender";
+    	private final Logger LOG = Logger.getLogger(MessageSender.class);
+    	
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			Log.d(TAG, "onReceive");
+			LOG.debug("onReceive");
 			
 			if(!isOnline() || !isConnected()){
-				Log.e(TAG, "onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());
+				LOG.error("onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());
 				return;
 			}
 			
@@ -972,6 +1004,7 @@ public class MqttService extends Service implements IMqttCallback
 			}
 			catch(MqttException e)
 			{
+				LOG.error(e.getMessage());
 				e.printStackTrace();
 			}
 		}
@@ -1012,6 +1045,8 @@ public class MqttService extends Service implements IMqttCallback
      */
     public class PingSender extends BroadcastReceiver 
     {
+    	private final Logger LOG = Logger.getLogger(PingSender.class);
+    	
         @Override
         public void onReceive(Context context, Intent intent) 
         {
@@ -1032,18 +1067,18 @@ public class MqttService extends Service implements IMqttCallback
             {
                 // if something goes wrong, it should result in connectionLost
                 //  being called, so we will handle it there
-                Log.e("mqtt", "ping failed - MQTT exception", e);
+                LOG.error("ping failed - MQTT exception", e);
                 
                 // assume the client connection is broken - trash it
                 try {                    
                     mqttClient.disconnect();
                 } 
                 catch (MqttPersistenceException e1) {
-                    Log.e("mqtt", "disconnect failed - persistence exception", e1);                
+                	LOG.error("disconnect failed - persistence exception", e1);                
                 }
 				catch (MqttException e2)
 				{					
-					Log.e("mqtt", "disconnect failed - mqtt exception", e2);              
+					LOG.error("disconnect failed - mqtt exception", e2);              
 				}
                 
                 // reconnect

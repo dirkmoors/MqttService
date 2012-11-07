@@ -1,5 +1,6 @@
 package com.qonect.protocols.mqtt.impl.paho;
 
+import org.apache.log4j.Logger;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
@@ -8,8 +9,6 @@ import org.eclipse.paho.client.mqttv3.MqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.MqttSecurityException;
 import org.eclipse.paho.client.mqttv3.MqttTopic;
-
-import android.util.Log;
 
 import com.qonect.protocols.mqtt.impl.MqttException;
 import com.qonect.protocols.mqtt.impl.MqttPersistenceException;
@@ -21,16 +20,16 @@ import com.qonect.protocols.mqtt.interfaces.IMqttTopic;
 
 public class PahoMqttClientWrapper implements IMqttClient
 {
-	private static final String TAG = "PahoMqttClientWrapper";
+	private static final Logger LOG = Logger.getLogger(PahoMqttClientWrapper.class);
 	
-	private static final String TOPIC_PING = "PING";
+	private static final String TOPIC_PING = "PING";	
 	
 	private MqttClient client;
 	
 	public PahoMqttClientWrapper(String serverURI, String clientId, 
 		MqttClientPersistence persistence) throws MqttException
 	{
-		Log.d(TAG, "init(serverURI="+serverURI+", clientId="+clientId+", persistence="+persistence+")");
+		LOG.debug("init(serverURI="+serverURI+", clientId="+clientId+", persistence="+persistence+")");
 		
 		try
 		{
@@ -45,7 +44,7 @@ public class PahoMqttClientWrapper implements IMqttClient
 	@Override
 	public void setCallback(final IMqttCallback callback) throws MqttException
 	{		
-		Log.d(TAG, "setCallback(callback="+callback+")");
+		LOG.debug("setCallback(callback="+callback+")");
 		try
 		{
 			this.client.setCallback(new MqttCallback()
@@ -63,7 +62,7 @@ public class PahoMqttClientWrapper implements IMqttClient
 				@Override
 				public void deliveryComplete(MqttDeliveryToken token)
 				{
-					Log.d(TAG, "deliveryComplete: "+token);
+					LOG.debug("deliveryComplete: "+token);
 				}
 				
 				@Override
@@ -83,7 +82,7 @@ public class PahoMqttClientWrapper implements IMqttClient
 	public void subscribe(IMqttTopic topic) throws IllegalArgumentException,
 		MqttException
 	{
-		Log.d(TAG, "subscribe(topic="+topic+")");
+		LOG.debug("subscribe(topic="+topic+")");
 		subscribe(new IMqttTopic[]{topic});
 	}
 
@@ -91,7 +90,7 @@ public class PahoMqttClientWrapper implements IMqttClient
 	public void subscribe(IMqttTopic[] topics) throws IllegalArgumentException,
 		MqttException
 	{
-		Log.d(TAG, "subscribe(topics="+topics+")");
+		LOG.debug("subscribe(topics="+topics+")");
 		
 		int amount = topics.length;
 		
@@ -121,7 +120,7 @@ public class PahoMqttClientWrapper implements IMqttClient
 	public void publish(IMqttTopic topic, IMqttMessage message)
 		throws MqttException
 	{
-		Log.d(TAG, "publish(topic="+topic+", message="+message+")");
+		LOG.debug("publish(topic="+topic+", message="+message+")");
 		
 		MqttTopic t = this.client.getTopic(topic.getName());
 		
@@ -153,7 +152,7 @@ public class PahoMqttClientWrapper implements IMqttClient
 	@Override
 	public void connect(IMqttConnectOptions options) throws MqttException
 	{
-		Log.d(TAG, "connect(options="+options+")");
+		LOG.debug("connect(options="+options+")");
 		
 		MqttConnectOptions o = new MqttConnectOptions();
 		o.setCleanSession(options.getCleanSession());		

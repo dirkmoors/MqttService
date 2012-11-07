@@ -3,10 +3,11 @@ package com.qonect.protocols.mqtt;
 import java.sql.Timestamp;
 import java.util.Date;
 
+import org.apache.log4j.Logger;
+
 import android.app.Activity;
 import android.content.IntentFilter;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -22,7 +23,7 @@ import com.qonect.protocols.mqtt.service.MqttService.ConnectionStatus;
 
 public class MqttTestActivity extends Activity implements MessageHandler, StatusHandler
 {	
-	private static final String TAG = "MqttTestActivity";
+	private static final Logger LOG = Logger.getLogger(MqttTestActivity.class);
 	
 	private MessageReceiver msgReceiver;
 	private StatusReceiver statusReceiver;
@@ -38,7 +39,7 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 		super.onCreate(savedInstanceState);		
 		setContentView(R.layout.main_test);
 		
-		Log.d(TAG, "onCreate");
+		LOG.debug("onCreate");
 		
 		timestampView = (TextView)findViewById(R.id.timestampView);
 		topicView = (TextView)findViewById(R.id.topicView);
@@ -62,7 +63,7 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 	@Override
 	protected void onResume()
 	{
-		Log.d(TAG, "onResume");
+		LOG.debug("onResume");
 		super.onResume();
 		
 		bindStatusReceiver();
@@ -74,7 +75,7 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 	@Override  
 	protected void onPause()   
 	{ 
-		Log.d(TAG, "onPause");
+		LOG.debug("onPause");
 		
 		//MqttServiceDelegate.stopService(this);
 		
@@ -122,7 +123,7 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 	public void handleMessage(String topic, byte[] payload) {
 		String message = new String(payload);
 		
-		Log.d(TAG, "handleMessage: topic="+topic+", message="+message);
+		LOG.debug("handleMessage: topic="+topic+", message="+message);
 				
 		if(timestampView != null)timestampView.setText("When: "+getCurrentTimestamp());
 		if(topicView != null)topicView.setText("Topic: "+topic);
@@ -133,7 +134,7 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 
 	@Override
 	public void handleStatus(ConnectionStatus status, String reason) {
-		Log.d(TAG, "handleStatus: status="+status+", reason="+reason);
+		LOG.debug("handleStatus: status="+status+", reason="+reason);
 		if(statusView != null)statusView.setText("Status: "+status.toString()+" ("+reason+")");
 	}
 }
