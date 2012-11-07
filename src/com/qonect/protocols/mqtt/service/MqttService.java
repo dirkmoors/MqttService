@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.log4j.Logger;
 
@@ -27,6 +29,7 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.provider.Settings.Secure;
+import android.util.Log;
 
 import com.qonect.protocols.mqtt.impl.MqttConnectOptions;
 import com.qonect.protocols.mqtt.impl.MqttException;
@@ -165,15 +168,14 @@ public class MqttService extends Service implements IMqttCallback
     // connection to the message broker
     private IMqttClient mqttClient = null;
     private IMqttClientFactory mqttClientFactory;
-    
-    // receiver that notifies the Service when an activity wants to publish to the mqtt
-    private MessageSender messageSender;
-    
+        
     // receiver that notifies the Service when the phone gets data connection 
     private NetworkConnectionIntentReceiver netConnReceiver;
     
     // receiver that wakes the Service up when it's time to ping the server
     private PingSender pingSender;
+    
+    private ExecutorService executor;
     
     /************************************************************************/
     /*    METHODS - core Service lifecycle methods                          */
@@ -202,6 +204,8 @@ public class MqttService extends Service implements IMqttCallback
         topics.add(new MqttTopic("test-topic"));
         
         mqttClientFactory = new PahoMqttClientFactory();  
+        
+        executor = Executors.newCachedThreadPool();
     }
     
     
@@ -231,12 +235,12 @@ public class MqttService extends Service implements IMqttCallback
     private void doStart(final Intent intent, final int startId){
     	initMqttClient();
     	
-        new Thread(new Runnable() {
+    	executor.submit(new Runnable() {
             @Override
             public void run() {
             	handleStart(intent, startId);
             }
-        }, "Mqttservice").start();
+        });
     }    
     
     protected void onConnect(){
@@ -252,6 +256,7 @@ public class MqttService extends Service implements IMqttCallback
 
     synchronized void handleStart(Intent intent, int startId) 
     {
+    	LOG.debug("handleStart");
         // before we start - check for a couple of reasons why we should stop
     	        
         if (mqttClient == null) 
@@ -277,13 +282,6 @@ public class MqttService extends Service implements IMqttCallback
             return;
         }
         
-        // the Activity UI has started the MQTT service - this may be starting
-        //  the Service new for the first time, or after the Service has been
-        //  running for some time (multiple calls to startService don't start
-        //  multiple Services, but it does call this method multiple times)
-        // if we have been running already, we re-send any stored data        
-        rebroadcastStatus();
-        //rebroadcastReceivedMessages();
         
         // if the Service was already running and we're already connected - we 
         //   don't need to do anything 
@@ -291,26 +289,6 @@ public class MqttService extends Service implements IMqttCallback
         {
             // set the status to show we're trying to connect
         	changeStatus(ConnectionStatus.CONNECTING);
-            
-            // we are creating a background service that will run forever until
-            //  the user explicity stops it. so - in case they start needing 
-            //  to save battery life - we should ensure that they don't forget
-            //  we're running, by leaving an ongoing notification in the status
-            //  bar while we are running
-            /*NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            Notification notification = new Notification(R.drawable.ic_launcher, 
-                                                         "MQTT",
-                                                         System.currentTimeMillis());                                                         
-            notification.flags |= Notification.FLAG_ONGOING_EVENT;
-            notification.flags |= Notification.FLAG_NO_CLEAR;
-            Intent notificationIntent = new Intent(this, MQTTNotifier.class);
-            PendingIntent contentIntent = PendingIntent.getActivity(this, 0, 
-                                                                    notificationIntent, 
-                                                                    PendingIntent.FLAG_UPDATE_CURRENT);
-            notification.setLatestEventInfo(this, "MQTT", "MQTT Service is running", contentIntent);        
-            nm.notify(MQTT_NOTIFICATION_ONGOING, notification);*/
-        	LOG.debug("handleStart: connectionStatus="+connectionStatus);
-            
             
             // before we attempt to connect - we check if the phone has a 
             //  working data connection
@@ -347,13 +325,6 @@ public class MqttService extends Service implements IMqttCallback
             	new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));            
         }
         
-        if(messageSender == null)
-        {
-        	messageSender = new MessageSender();
-        	registerReceiver(messageSender,
-        		new IntentFilter(MQTT_PUBLISH_MSG_INTENT));
-        }
-        
         // creates the intents that are used to wake up the phone when it is 
         //  time to ping the server
         if (pingSender == null)
@@ -361,7 +332,31 @@ public class MqttService extends Service implements IMqttCallback
             pingSender = new PingSender();
             registerReceiver(pingSender, new IntentFilter(MQTT_PING_ACTION));
         }
+        
+        if(!handleStartAction(intent)){
+        	// the Activity UI has started the MQTT service - this may be starting
+            //  the Service new for the first time, or after the Service has been
+            //  running for some time (multiple calls to startService don't start
+            //  multiple Services, but it does call this method multiple times)
+            // if we have been running already, we re-send any stored data        
+            rebroadcastStatus();
+        }
     }
+    
+    private boolean handleStartAction(Intent intent){
+    	String action = intent.getAction(); 	
+    	
+    	if(action == null){
+        	return false;
+        }
+    	
+    	if(action.equalsIgnoreCase(MQTT_PUBLISH_MSG_INTENT)){
+    		LOG.debug("handleStartAction: action == MQTT_PUBLISH_MSG_INTENT");
+    		handlePublishMessageIntent(intent);
+    	}
+    	
+    	return true;
+    }    
 
     @Override
     public void onDestroy() 
@@ -679,7 +674,7 @@ public class MqttService extends Service implements IMqttCallback
     }
     
     
-    private void reconnectInNewThread(){
+    /*private void reconnectInNewThread(){
     	new Thread(new Runnable(){
 			@Override
 			public void run()
@@ -694,7 +689,7 @@ public class MqttService extends Service implements IMqttCallback
 			}
     		
     	}).start(); 
-    }
+    }*/
     
     /*
      * (Re-)connect to the message broker
@@ -826,12 +821,6 @@ public class MqttService extends Service implements IMqttCallback
                 unregisterReceiver(pingSender);
                 pingSender = null;
             }
-            
-            if(messageSender != null)
-            {
-            	unregisterReceiver(messageSender);
-            	messageSender = null;
-            }
         }
         catch (Exception eee)
         {
@@ -959,6 +948,7 @@ public class MqttService extends Service implements IMqttCallback
     }
     
     private void changeStatus(ConnectionStatus newStatus){
+    	LOG.debug("changeStatus -> "+newStatus.toString());
     	connectionStatus = newStatus;
     	connectionStatusChangeTime = new Timestamp(new Date().getTime());
     }
@@ -983,32 +973,25 @@ public class MqttService extends Service implements IMqttCallback
         LOG.debug("initLog: Logging to ["+backupPath.getPath()+"]");
     }
     
-    public class MessageSender extends BroadcastReceiver  
-	{
-    	private final Logger LOG = Logger.getLogger(MessageSender.class);
-    	
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			LOG.debug("onReceive");
-			
-			if(!isOnline() || !isConnected()){
-				LOG.error("onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());
-				return;
-			}
-			
-			byte[] payload = intent.getByteArrayExtra(MQTT_PUBLISH_MSG);
-			
-			try
-			{
-				mqttClient.publish(new MqttTopic("test-topic"), new MqttMessage(payload));
-			}
-			catch(MqttException e)
-			{
-				LOG.error(e.getMessage());
-				e.printStackTrace();
-			}
+    private void handlePublishMessageIntent(Intent intent){
+    	LOG.debug("handlePublishMessageIntent: intent="+intent);
+    	if(!isOnline() || !isConnected()){
+			LOG.error("handlePublishMessageIntent: isOnline()="+isOnline()+", isConnected()="+isConnected());
+			return;
 		}
-	}
+		
+		byte[] payload = intent.getByteArrayExtra(MQTT_PUBLISH_MSG);
+		
+		try
+		{
+			mqttClient.publish(new MqttTopic("test-topic"), new MqttMessage(payload));
+		}
+		catch(MqttException e)
+		{
+			LOG.error(e.getMessage());
+			e.printStackTrace();
+		}
+    }
     
     /*
      * Called in response to a change in network connection - after losing a 
@@ -1017,6 +1000,8 @@ public class MqttService extends Service implements IMqttCallback
      */
     private class NetworkConnectionIntentReceiver extends BroadcastReceiver
     {
+    	private final Logger LOG = Logger.getLogger(NetworkConnectionIntentReceiver.class); 
+    	
         @Override
         public void onReceive(Context ctx, Intent intent) 
         {
@@ -1028,8 +1013,9 @@ public class MqttService extends Service implements IMqttCallback
             wl.acquire();
             
             if (isOnline() && !isConnected())
-            {
-            	reconnectInNewThread();            	               
+            {            
+            	LOG.warn("onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());  
+            	doStart(null, -1);    	               
             }
             
             // we're finished - if the phone is switched off, it's okay for the CPU 
@@ -1059,30 +1045,42 @@ public class MqttService extends Service implements IMqttCallback
             //  finished handling the broadcast."
             // This is good enough for our needs.
             
-            try 
-            {
-                mqttClient.ping();         
-            } 
-            catch (MqttException e) 
-            {
-                // if something goes wrong, it should result in connectionLost
-                //  being called, so we will handle it there
-                LOG.error("ping failed - MQTT exception", e);
-                
-                // assume the client connection is broken - trash it
-                try {                    
-                    mqttClient.disconnect();
-                } 
-                catch (MqttPersistenceException e1) {
-                	LOG.error("disconnect failed - persistence exception", e1);                
-                }
-				catch (MqttException e2)
-				{					
-					LOG.error("disconnect failed - mqtt exception", e2);              
-				}
-                
-                // reconnect
-                reconnectInNewThread();               
+        	if(isOnline() && !isConnected())
+        	{
+        		LOG.warn("onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());
+        		doStart(null, -1);
+        	}
+        	else if(!isOnline()){
+        		LOG.debug("Waiting for network to come online again");        		
+        	}
+        	else
+        	{        	
+	            try
+	            {
+	                mqttClient.ping();         
+	            } 
+	            catch (MqttException e) 
+	            {
+	                // if something goes wrong, it should result in connectionLost
+	                //  being called, so we will handle it there
+	                LOG.error("ping failed - MQTT exception", e);
+	                
+	                // assume the client connection is broken - trash it
+	                try {                    
+	                    mqttClient.disconnect();
+	                } 
+	                catch (MqttPersistenceException e1) {
+	                	LOG.error("disconnect failed - persistence exception", e1);                
+	                }
+					catch (MqttException e2)
+					{					
+						LOG.error("disconnect failed - mqtt exception", e2);              
+					}
+	                
+	                // reconnect
+	                LOG.warn("onReceive: MqttException="+e);
+	                doStart(null, -1);           
+	            }
             }
 
             // start the next keep alive period 

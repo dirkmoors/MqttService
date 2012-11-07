@@ -36,10 +36,12 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 	@Override  
 	public void onCreate(Bundle savedInstanceState)   
 	{  
-		super.onCreate(savedInstanceState);		
-		setContentView(R.layout.main_test);
-		
 		LOG.debug("onCreate");
+		
+		super.onCreate(savedInstanceState);		
+		
+		//Init UI
+		setContentView(R.layout.main_test);	
 		
 		timestampView = (TextView)findViewById(R.id.timestampView);
 		topicView = (TextView)findViewById(R.id.topicView);
@@ -58,31 +60,26 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 					publishEditView.getText().toString().getBytes());
 			}
 		});
-	}  
-	
-	@Override
-	protected void onResume()
-	{
-		LOG.debug("onResume");
-		super.onResume();
 		
+		//Init Receivers
 		bindStatusReceiver();
 		bindMessageReceiver();
 
+		//Start service if not started
 		MqttServiceDelegate.startService(this);
-	}
+	} 
 
 	@Override  
-	protected void onPause()   
+	protected void onDestroy()   
 	{ 
-		LOG.debug("onPause");
+		LOG.debug("onDestroy");
 		
 		//MqttServiceDelegate.stopService(this);
 		
 		unbindMessageReceiver();
 		unbindStatusReceiver();
 		
-	    super.onPause(); 
+	    super.onDestroy(); 
 	}
 	
 	private void bindMessageReceiver(){
@@ -128,9 +125,7 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 		if(timestampView != null)timestampView.setText("When: "+getCurrentTimestamp());
 		if(topicView != null)topicView.setText("Topic: "+topic);
 		if(messageView != null)messageView.setText("Message: "+message);
-	}
-	
-	
+	}	
 
 	@Override
 	public void handleStatus(ConnectionStatus status, String reason) {

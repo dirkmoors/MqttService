@@ -33,11 +33,11 @@ public class MqttServiceDelegate
 	
 	public static void publish(Context context, String topic, byte[] payload)
 	{
-		Intent broadcastIntent = new Intent();
-        broadcastIntent.setAction(MqttService.MQTT_PUBLISH_MSG_INTENT);
-        broadcastIntent.putExtra(MqttService.MQTT_PUBLISH_MSG_TOPIC, topic);
-        broadcastIntent.putExtra(MqttService.MQTT_PUBLISH_MSG, payload);
-        context.sendBroadcast(broadcastIntent); 
+		Intent actionIntent = new Intent(context, MqttService.class);
+        actionIntent.setAction(MqttService.MQTT_PUBLISH_MSG_INTENT);
+        actionIntent.putExtra(MqttService.MQTT_PUBLISH_MSG_TOPIC, topic);
+        actionIntent.putExtra(MqttService.MQTT_PUBLISH_MSG, payload);
+        context.startService(actionIntent);
 	}
 	
 	public static class StatusReceiver extends BroadcastReceiver  

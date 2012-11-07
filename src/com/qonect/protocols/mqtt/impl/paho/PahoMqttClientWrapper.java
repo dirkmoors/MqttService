@@ -152,6 +152,18 @@ public class PahoMqttClientWrapper implements IMqttClient
 	@Override
 	public void connect(IMqttConnectOptions options) throws MqttException
 	{
+		if(this.client.isConnected()){
+			try
+			{
+				disconnect();
+			}
+			catch (MqttPersistenceException e)
+			{
+				e.printStackTrace();
+				return;
+			}
+		}
+		
 		LOG.debug("connect(options="+options+")");
 		
 		MqttConnectOptions o = new MqttConnectOptions();
@@ -177,6 +189,8 @@ public class PahoMqttClientWrapper implements IMqttClient
 	@Override
 	public void disconnect() throws MqttException, MqttPersistenceException
 	{
+		if(!this.client.isConnected())return;
+		
 		try
 		{
 			this.client.disconnect();
