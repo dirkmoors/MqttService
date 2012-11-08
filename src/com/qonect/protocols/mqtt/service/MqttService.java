@@ -29,7 +29,6 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.provider.Settings.Secure;
-import android.util.Log;
 
 import com.qonect.protocols.mqtt.impl.MqttConnectOptions;
 import com.qonect.protocols.mqtt.impl.MqttException;
@@ -181,7 +180,7 @@ public class MqttService extends Service implements IMqttCallback
     /*    METHODS - core Service lifecycle methods                          */
     /************************************************************************/
     // see http://developer.android.com/guide/topics/fundamentals.html#lcycles
-    
+        
     @Override
     public void onCreate() 
     {
@@ -203,8 +202,8 @@ public class MqttService extends Service implements IMqttCallback
         brokerHostName = "profile-staging.jackzz.net";
         topics.add(new MqttTopic("test-topic"));
         
-        mqttClientFactory = new PahoMqttClientFactory();  
-        
+        mqttClientFactory = new PahoMqttClientFactory(); 
+                
         executor = Executors.newCachedThreadPool();
     }
     
@@ -924,7 +923,7 @@ public class MqttService extends Service implements IMqttCallback
         
         NetworkInfo netInfo = cm.getActiveNetworkInfo();
         
-        return netInfo != null && netInfo.isAvailable() && netInfo.isConnected();
+        return netInfo.isAvailable() && netInfo.isConnected();
     }
     
     private String getClientId()
@@ -975,8 +974,12 @@ public class MqttService extends Service implements IMqttCallback
     
     private void handlePublishMessageIntent(Intent intent){
     	LOG.debug("handlePublishMessageIntent: intent="+intent);
-    	if(!isOnline() || !isConnected()){
-			LOG.error("handlePublishMessageIntent: isOnline()="+isOnline()+", isConnected()="+isConnected());
+    	
+    	boolean isOnline = isOnline();
+    	boolean isConnected = isConnected();
+    	
+    	if(!isOnline || !isConnected){
+			LOG.error("handlePublishMessageIntent: isOnline()="+isOnline+", isConnected()="+isConnected);
 			return;
 		}
 		
@@ -1011,6 +1014,8 @@ public class MqttService extends Service implements IMqttCallback
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
             WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MQTT");
             wl.acquire();
+            
+            LOG.debug("onReceive: intent="+intent);  
             
             if (isOnline() && !isConnected())
             {            
