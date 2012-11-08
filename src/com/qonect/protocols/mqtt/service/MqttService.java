@@ -204,7 +204,7 @@ public class MqttService extends Service implements IMqttCallback
         
         mqttClientFactory = new PahoMqttClientFactory(); 
                 
-        executor = Executors.newCachedThreadPool();
+        executor = Executors.newFixedThreadPool(2);
     }
     
     
@@ -923,7 +923,7 @@ public class MqttService extends Service implements IMqttCallback
         
         NetworkInfo netInfo = cm.getActiveNetworkInfo();
         
-        return netInfo.isAvailable() && netInfo.isConnected();
+        return netInfo != null && netInfo.isAvailable() && netInfo.isConnected();
     }
     
     private String getClientId()
@@ -1014,12 +1014,10 @@ public class MqttService extends Service implements IMqttCallback
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
             WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MQTT");
             wl.acquire();
-            
-            LOG.debug("onReceive: intent="+intent);  
-            
+                        
+            LOG.warn("onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());  
             if (isOnline() && !isConnected())
             {            
-            	LOG.warn("onReceive: isOnline()="+isOnline()+", isConnected()="+isConnected());  
             	doStart(null, -1);    	               
             }
             

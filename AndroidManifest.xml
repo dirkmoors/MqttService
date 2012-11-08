@@ -14,7 +14,7 @@
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme">
         
-		<service android:name=".service.MqttService" android:process=":MqttService"></service>		
+		<service android:name=".service.MqttService" android:process=":MqttSubProcess"></service>		
         <activity android:name="MqttTestActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

@@ -74,7 +74,7 @@ public class MqttTestActivity extends Activity implements MessageHandler, Status
 	{ 
 		LOG.debug("onDestroy");
 		
-		//MqttServiceDelegate.stopService(this);
+		MqttServiceDelegate.stopService(this);
 		
 		unbindMessageReceiver();
 		unbindStatusReceiver();
