@@ -267,6 +267,13 @@ public class MqttService extends Service implements IMqttCallback
             return;
         }
         
+        if (connectionStatus == ConnectionStatus.NOTCONNECTED_USERDISCONNECT) {
+            // When calling startService in multiple activities, onStartCommand()
+            // is called when activies are switched. Thus the service would connect
+            // automatically even though the user might have requested the disconnect. 
+            return;
+        }
+        
         if (!isBackgroundDataEnabled()) // respect the user's request not to use data!
         {
             // user has disabled background data
