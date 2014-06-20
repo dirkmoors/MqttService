@@ -4,10 +4,13 @@ import com.qonect.protocols.mqtt.interfaces.IMqttConnectOptions;
 
 public class MqttConnectOptions implements IMqttConnectOptions
 {
+	//isCleanSession
+	private boolean isClean ;
+	
 	@Override
 	public void setCleanSession(boolean cleanStart)
 	{
-		// TODO Auto-generated method stub
+		isClean = cleanStart ;
 		
 	}
 
@@ -35,8 +38,8 @@ public class MqttConnectOptions implements IMqttConnectOptions
 	@Override
 	public boolean getCleanSession()
 	{
-		// TODO Auto-generated method stub
-		return false;
+		
+		return isClean;
 	}
 
 	@Override
